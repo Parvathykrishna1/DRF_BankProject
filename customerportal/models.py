@@ -206,14 +206,6 @@ class CustomerMessages(models.Model):
     phone_number = models.CharField(max_length=100, blank=True, null=True)
     message = models.CharField(max_length=100, blank=True, null=True)
 
-class Expense(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    category = models.CharField(max_length=100)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    description = models.TextField()
-    date = models.DateField(auto_now_add=True)
-
-
 
 class Budget(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
