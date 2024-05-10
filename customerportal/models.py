@@ -210,8 +210,11 @@ class CustomerMessages(models.Model):
     phone_number = models.CharField(max_length=100, blank=True, null=True)
     message = models.CharField(max_length=100, blank=True, null=True)
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> a242b406695cb2ee58d0dece2259c8f502e99ce6
 
 class Budget(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
