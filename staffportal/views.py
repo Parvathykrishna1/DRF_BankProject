@@ -111,7 +111,6 @@ class StaffLoginView(generics.CreateAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 class StaffLogoutView(generics.GenericAPIView):
     """
     API view for staff logout.
@@ -346,7 +345,6 @@ class AllUsersTransactionHistoryAPIView(APIView):
         return Response(response_data)
 
 
-
 class FDAndRDInterestRateAPIView(APIView):
     """
     API view for retrieving, creating, updating, and deleting fixed deposit and recurring deposit interest rates.
@@ -377,7 +375,9 @@ class FDAndRDInterestRateAPIView(APIView):
             serializer = FDAndRDInterestRateSerializer(interest_rate)
             return Response(serializer.data)
         else:
-            return Response({"error": "No interest rate found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "No interest rate found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
     def post(self, request):
         """
@@ -392,7 +392,9 @@ class FDAndRDInterestRateAPIView(APIView):
         # Check if an instance already exists
         existing_instance = self.get_object()
         if existing_instance:
-            serializer = FDAndRDInterestRateSerializer(existing_instance, data=request.data)
+            serializer = FDAndRDInterestRateSerializer(
+                existing_instance, data=request.data
+            )
         else:
             serializer = FDAndRDInterestRateSerializer(data=request.data)
 
@@ -419,7 +421,9 @@ class FDAndRDInterestRateAPIView(APIView):
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         else:
-            return Response({"error": "No interest rate found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "No interest rate found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
     def delete(self, request):
         """
@@ -434,11 +438,14 @@ class FDAndRDInterestRateAPIView(APIView):
         interest_rate = self.get_object()
         if interest_rate:
             interest_rate.delete()
-            return Response({"message": "Interest rate deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+            return Response(
+                {"message": "Interest rate deleted successfully"},
+                status=status.HTTP_204_NO_CONTENT,
+            )
         else:
-            return Response({"error": "No interest rate found"}, status=status.HTTP_404_NOT_FOUND)
-
-
+            return Response(
+                {"error": "No interest rate found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
 
 class LoanInterestRateCreateAPIView(generics.CreateAPIView):
@@ -504,7 +511,6 @@ class LoanInterestListAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
 
-
 class UserLoanApplicationListView(generics.ListAPIView):
     """
     API view for listing loan applications.
@@ -523,7 +529,6 @@ class UserLoanApplicationListView(generics.ListAPIView):
             QuerySet: Loan application queryset.
         """
         return LoanApplication.objects.all()
-
 
 
 class CustomerReviewDisplayAPIView(APIView):

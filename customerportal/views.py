@@ -87,7 +87,6 @@ def send_registration_email(email):
     send_mail(subject, message, sender_email, recipient_list)
 
 
-
 class CustomerLoginView(APIView):
     """
     Log in to AX Bank.
@@ -102,7 +101,7 @@ class CustomerLoginView(APIView):
     permission_classes = [AllowAny]
     serializer_class = CustomerLoginSerializer
     MAX_LOGIN_ATTEMPTS = 3
-    BLOCK_DURATION_SECONDS = 5  
+    BLOCK_DURATION_SECONDS = 5
 
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
@@ -136,7 +135,9 @@ class CustomerLoginView(APIView):
                 # Check if login attempts exceed threshold
                 if attempts >= self.MAX_LOGIN_ATTEMPTS:
                     return Response(
-                        {"message": "Too many failed login attempts. Account blocked 300seconds."},
+                        {
+                            "message": "Too many failed login attempts. Account blocked 300seconds."
+                        },
                         status=status.HTTP_403_FORBIDDEN,
                     )
 
@@ -147,7 +148,6 @@ class CustomerLoginView(APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 class CustomerLogoutView(generics.GenericAPIView):
@@ -249,14 +249,15 @@ class UpdateProfileAPIView(APIView):
             HTTP response indicating profile update status.
         """
         user = self.get_object()
-        serializer = CustomerRegistrationSerializer(user, data=request.data, partial=True)  # Set partial=True
+        serializer = CustomerRegistrationSerializer(
+            user, data=request.data, partial=True
+        )  # Set partial=True
         if serializer.is_valid():
             serializer.save()
             return Response(
                 {"message": "Profile updated successfully"}, status=status.HTTP_200_OK
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 class BankAccountListView(APIView):
@@ -281,7 +282,6 @@ class BankAccountListView(APIView):
         bank_accounts = BankAccount.objects.all()
         serializer = BankAccountSerializer(bank_accounts, many=True)
         return Response(serializer.data)
-
 
 
 class CreateAccountAPIView(APIView):
@@ -311,7 +311,6 @@ class CreateAccountAPIView(APIView):
             message = f"Account created successfully. Your account number is: {account_number}"
             return Response({"message": message}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 class UserAccountAPIView(APIView):
@@ -565,7 +564,6 @@ class TransactionHistoryAPIView(APIView):
             )
 
         return Response(response_data)
-
 
 
 class FixedDepositCreateAPIView(generics.CreateAPIView):
@@ -896,8 +894,6 @@ class FundTransferAPIView(APIView):
         return Response(response_data)
 
 
-
-
 class FundTransferListAPIView(generics.ListAPIView):
     """
     API view for listing fund transfers.
@@ -933,9 +929,10 @@ class FundTransferListAPIView(generics.ListAPIView):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         if not queryset:
-            return Response({"message": "No fund transfers found for the current user."})
+            return Response(
+                {"message": "No fund transfers found for the current user."}
+            )
         return Response(serializer.data)
-
 
 
 class LoanApplicationCreateAPIView(generics.CreateAPIView):
@@ -1077,11 +1074,11 @@ class RatingReviewAPIView(APIView):
         )
 
 
-
 from rest_framework.response import Response
 from rest_framework import status
 from .models import CustomerMessages
 from .serializers import CustomerMessagesSerializer
+
 
 class SaveCustomerMessagesAPIView(APIView):
     """
@@ -1104,7 +1101,7 @@ class SaveCustomerMessagesAPIView(APIView):
         email_ = request.data.get("email")
         phone_no_ = request.data.get("phone_no")
         message_ = request.data.get("message")
-        
+
         serializer = CustomerMessagesSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(user=request.user)
@@ -1117,8 +1114,6 @@ class SaveCustomerMessagesAPIView(APIView):
                 serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-
 
 
 class BudgetAPIView(APIView):
@@ -1273,7 +1268,6 @@ class ExpenseListCreateAPIView(generics.ListCreateAPIView):
             {"message": "Expense created successfully", "data": serializer.data},
             status=status.HTTP_201_CREATED,
         )
-
 
 
 class SavingsGoalListCreateAPIView(generics.ListCreateAPIView):
