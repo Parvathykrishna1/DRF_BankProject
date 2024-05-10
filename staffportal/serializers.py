@@ -3,6 +3,7 @@ from rest_framework import serializers
 from staffportal.models import BankAccount, BankNews, CustomUser, FDAndRDInterestRate, LoanApproval, LoanInterestRate
 from django.contrib.auth.password_validation import validate_password
 
+
 class RegisterNewAdminSerializer(serializers.ModelSerializer):
     is_superuser = serializers.BooleanField(default=False, read_only=True)
     is_staff = serializers.BooleanField(default=False, read_only=True)
@@ -11,12 +12,13 @@ class RegisterNewAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['first_name', 'last_name', 'email', 'username', 'password', 'confirm_password', 'is_superuser', 'is_staff']
-        extra_kwargs = {'first_name': {'required': True},
-                        'last_name': {'required': True},
-                        'email': {'required': True},
-                        'username': {'required': True},
-                        'password': {'write_only': True, 'required': True}
-                        }
+        extra_kwargs = {
+            'first_name': {'required': True},
+            'last_name': {'required': True},
+            'email': {'required': True, 'error_messages': {'required': 'Email is required.'}},
+            'username': {'required': True, 'error_messages': {'required': 'Username is required.'}},
+            'password': {'write_only': True, 'required': True, 'error_messages': {'required': 'Password is required.'}}
+        }
 
     def validate(self, data):
         if data['password'] != data.pop('confirm_password'):
@@ -31,6 +33,21 @@ class RegisterNewAdminSerializer(serializers.ModelSerializer):
 
         return data
 
+    def validate_password(self, value):
+        # Minimum password length
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+
+        # Check if password contains uppercase, lowercase, and digits
+        if not any(char.isupper() for char in value):
+            raise serializers.ValidationError("Password must contain at least one uppercase letter.")
+        if not any(char.islower() for char in value):
+            raise serializers.ValidationError("Password must contain at least one lowercase letter.")
+        if not any(char.isdigit() for char in value):
+            raise serializers.ValidationError("Password must contain at least one digit.")
+
+        return value
+
     def create(self, validated_data):
         email = validated_data['email']
         username = validated_data['username']
@@ -43,6 +60,7 @@ class RegisterNewAdminSerializer(serializers.ModelSerializer):
             user.set_password(validated_data['password'])
             user.save()
             return user
+
 
 
 
@@ -75,15 +93,10 @@ class FDAndRDInterestRateSerializer(serializers.ModelSerializer):
         fields = ['id', 'rate']
 
 
-class InterestRateSerializer(serializers.ModelSerializer):
+class LoanInterestRateInterestRateSerializer(serializers.ModelSerializer):
     class Meta:
         model = LoanInterestRate
         fields = ['loan_type', 'rate'] 
-
-class LoanApprovalSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LoanApproval
-        fields = ['loan_application', 'new_status']
 
 
 class BankNewsSerializer(serializers.ModelSerializer):

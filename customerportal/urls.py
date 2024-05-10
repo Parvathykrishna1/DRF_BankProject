@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import BankAccountListView, BudgetAPIView, CreateAccountAPIView, CustomerRegistrationView, CustomerLoginView, CustomerLogoutView, DeleteAccountAPIView, DepositAPIView, ExpenseListCreateAPIView, FixedDepositCreateAPIView, FixedDepositListAPIView, FundTransferAPIView, LoanApplicationCreateAPIView, PasswordResetView, RatingReviewAPIView, RecurrentDepositCreateAPIView, RecurrentDepositListAPIView, SaveCustomerMessagesAPIView, SavingsGoalDetailAPIView, SavingsGoalListCreateAPIView, TransactionHistoryAPIView, UpdateProfileAPIView, UserAccountAPIView, WithdrawalAPIView
+from .views import *
 
 urlpatterns = [
     path('register/', CustomerRegistrationView.as_view(), name='customer_register'),
@@ -19,7 +19,9 @@ urlpatterns = [
     path('bank/accounts/recurrent-deposit/create/', RecurrentDepositCreateAPIView.as_view(), name='recurrent_deposit_create'),
     path('bank/accounts/recurrent-deposit/list/', RecurrentDepositListAPIView.as_view(), name='recurrent_deposit_list'),
     path('bank/accounts/fund-transfer/', FundTransferAPIView.as_view(), name='fund_transfer'),
+    path('fund-transfers/list/', FundTransferListAPIView.as_view(), name='fund_transfer_list'),
     path('bank/accounts/loan-application/create/', LoanApplicationCreateAPIView.as_view(), name='loan_application_create'),
+    path('loan-applications/', LoanApplicationListAPIView.as_view(), name='loan-application-list'),
     path('ratings-reviews/', RatingReviewAPIView.as_view(), name='ratings_reviews'),
     path('messages/save/', SaveCustomerMessagesAPIView.as_view(), name='save_customer_messages'),
     path('budget-control/', BudgetAPIView.as_view(), name='budget-control'),

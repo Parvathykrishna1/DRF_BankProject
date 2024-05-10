@@ -15,7 +15,7 @@ from customerportal.serializers import (
 )
 from customerportal.models import *
 from staffportal.models import *
-from .serializers import *
+from staffportal.serializers import *
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.core.cache import cache  # For caching login attempts
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
@@ -63,8 +63,6 @@ class StaffLoginView(generics.CreateAPIView):
     permission_classes = [AllowAny]  # Allow any user to attempt login
     queryset = CustomUser.objects.all()
     serializer_class = StaffLoginSerializer
-    MAX_LOGIN_ATTEMPTS = 3
-    BLOCK_DURATION_SECONDS = 300  # Block user for 5 minutes (300 seconds)
 
     def post(self, request, *args, **kwargs):
         """
@@ -76,6 +74,7 @@ class StaffLoginView(generics.CreateAPIView):
         Returns:
             Response: HTTP response with JWT tokens or error message.
         """
+
         serializer = StaffLoginSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data.get("email")
@@ -83,20 +82,8 @@ class StaffLoginView(generics.CreateAPIView):
             user = authenticate(email=email, password=password)
 
             if user and user.staff:
-                # Check if user is blocked
-                if cache.get(email):
-                    return Response(
-                        {
-                            "message": "Account is temporarily blocked. Please try again later."
-                        },
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
-
                 # Attempt login
                 if user.check_password(password):
-                    # Clear login attempts on successful login
-                    cache.delete(email)
-
                     # Generate JWT access token
                     access_token = AccessToken.for_user(user)
                     # Generate JWT refresh token
@@ -111,24 +98,10 @@ class StaffLoginView(generics.CreateAPIView):
                         status=status.HTTP_200_OK,
                     )
                 else:
-                    # Increment login attempt count
-                    attempts = cache.get(email, 0)
-                    attempts += 1
-                    cache.set(email, attempts, self.BLOCK_DURATION_SECONDS)
-
-                    # Check if login attempts exceed threshold
-                    if attempts >= self.MAX_LOGIN_ATTEMPTS:
-                        return Response(
-                            {
-                                "message": "Too many failed login attempts. Account blocked."
-                            },
-                            status=status.HTTP_403_FORBIDDEN,
-                        )
-                    else:
-                        return Response(
-                            {"message": "Invalid email or password."},
-                            status=status.HTTP_401_UNAUTHORIZED,
-                        )
+                    return Response(
+                        {"message": "Invalid email or password."},
+                        status=status.HTTP_401_UNAUTHORIZED,
+                    )
             else:
                 return Response(
                     {"message": "Invalid email or password."},
@@ -136,6 +109,7 @@ class StaffLoginView(generics.CreateAPIView):
                 )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class StaffLogoutView(generics.GenericAPIView):
@@ -372,15 +346,21 @@ class AllUsersTransactionHistoryAPIView(APIView):
         return Response(response_data)
 
 
+
 class FDAndRDInterestRateAPIView(APIView):
     """
-    API view for retrieving and updating fixed deposit and recurring deposit interest rates.
-
-    Allows retrieving and updating fixed deposit and recurring deposit interest rates.
+    API view for retrieving, creating, updating, and deleting fixed deposit and recurring deposit interest rates.
     """
 
-    serializer_class = InterestRateSerializer
+    serializer_class = FDAndRDInterestRateSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def get_object(self):
+        # Check if an instance of FDAndRDInterestRate exists with id=1
+        try:
+            return FDAndRDInterestRate.objects.get(id=1)
+        except FDAndRDInterestRate.DoesNotExist:
+            return None
 
     def get(self, request):
         """
@@ -392,16 +372,34 @@ class FDAndRDInterestRateAPIView(APIView):
         Returns:
             Response: HTTP response with interest rates or error message.
         """
-        try:
-            interest_rate = FDAndRDInterestRate.objects.get(
-                id=1
-            )  # Assuming only one interest rate will be stored with ID 1
-            serializer = InterestRateSerializer(interest_rate)
+        interest_rate = self.get_object()
+        if interest_rate:
+            serializer = FDAndRDInterestRateSerializer(interest_rate)
             return Response(serializer.data)
-        except FDAndRDInterestRate.DoesNotExist:
-            return Response(
-                {"error": "No interest rate found"}, status=status.HTTP_404_NOT_FOUND
-            )
+        else:
+            return Response({"error": "No interest rate found"}, status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request):
+        """
+        Handle POST request for creating fixed deposit and recurring deposit interest rates.
+
+        Args:
+            request: HTTP request object.
+
+        Returns:
+            Response: HTTP response with created interest rates or error message.
+        """
+        # Check if an instance already exists
+        existing_instance = self.get_object()
+        if existing_instance:
+            serializer = FDAndRDInterestRateSerializer(existing_instance, data=request.data)
+        else:
+            serializer = FDAndRDInterestRateSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save(id=1)  # Set ID to 1 to ensure only one interest rate exists
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request):
         """
@@ -413,102 +411,34 @@ class FDAndRDInterestRateAPIView(APIView):
         Returns:
             Response: HTTP response with updated interest rates or error message.
         """
-        try:
-            interest_rate = FDAndRDInterestRate.objects.get(id=1)
-            serializer = InterestRateSerializer(interest_rate, data=request.data)
+        interest_rate = self.get_object()
+        if interest_rate:
+            serializer = FDAndRDInterestRateSerializer(interest_rate, data=request.data)
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except FDAndRDInterestRate.DoesNotExist:
-            serializer = InterestRateSerializer(data=request.data)
-            if serializer.is_valid():
-                serializer.save(
-                    id=1
-                )  # Set ID to 1 to ensure only one interest rate exists
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "No interest rate found"}, status=status.HTTP_404_NOT_FOUND)
 
-
-class UserFixedDepositsAPIView(generics.ListAPIView):
-    """
-    API view for retrieving fixed deposits of a user.
-
-    Allows retrieving fixed deposits of a user by their user ID.
-    """
-
-    serializer_class = FixedDepositSerializer
-    permission_classes = [IsAuthenticated, IsAdminUser]
-
-    def get_queryset(self):
+    def delete(self, request):
         """
-        Get queryset of fixed deposits for a user.
-
-        Returns:
-            QuerySet: Fixed deposit queryset.
-        """
-        user_id = self.kwargs["user_id"]
-        user_fixed_deposits = FixedDeposit.objects.filter(user_id=user_id)
-        return user_fixed_deposits
-
-
-class UserRecurrentDepositsAPIView(generics.ListAPIView):
-    """
-    API view for retrieving recurring deposits of a user.
-
-    Allows retrieving recurring deposits of a user by their user ID.
-    """
-
-    serializer_class = RecurrentDepositSerializer
-    permission_classes = [IsAuthenticated, IsAdminUser]
-
-    def get_queryset(self):
-        """
-        Get queryset of recurring deposits for a user.
-
-        Returns:
-            QuerySet: Recurrent deposit queryset.
-        """
-        user_id = self.kwargs["user_id"]
-        user_recurrent_deposits = RecurrentDeposit.objects.filter(user_id=user_id)
-        return user_recurrent_deposits
-
-
-class FundTransferListAPIView(generics.ListAPIView):
-    """
-    API view for listing fund transfers.
-
-    Allows listing all fund transfers.
-    """
-
-    queryset = FundTransfer.objects.all()
-    serializer_class = FundTransferSerializer
-    permission_classes = [IsAuthenticated, IsAdminUser]
-
-    def get_queryset(self):
-        """
-        Get queryset of fund transfers.
-
-        Returns:
-            QuerySet: Fund transfer queryset.
-        """
-        return super().get_queryset()
-
-    def list(self, request, *args, **kwargs):
-        """
-        Handle GET request for listing fund transfers.
+        Handle DELETE request for deleting fixed deposit and recurring deposit interest rates.
 
         Args:
             request: HTTP request object.
-            *args: Additional arguments.
-            **kwargs: Additional keyword arguments.
 
         Returns:
-            Response: HTTP response with list of fund transfers.
+            Response: HTTP response with success message or error message.
         """
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        interest_rate = self.get_object()
+        if interest_rate:
+            interest_rate.delete()
+            return Response({"message": "Interest rate deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({"error": "No interest rate found"}, status=status.HTTP_404_NOT_FOUND)
+
+
 
 
 class LoanInterestRateCreateAPIView(generics.CreateAPIView):
@@ -519,7 +449,7 @@ class LoanInterestRateCreateAPIView(generics.CreateAPIView):
     """
 
     queryset = LoanInterestRate.objects.all()
-    serializer_class = InterestRateSerializer
+    serializer_class = LoanInterestRateInterestRateSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def create(self, request, *args, **kwargs):
@@ -558,7 +488,7 @@ class LoanInterestRateUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView
     """
 
     queryset = LoanInterestRate.objects.all()
-    serializer_class = InterestRateSerializer
+    serializer_class = LoanInterestRateInterestRateSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
 
 
@@ -570,57 +500,9 @@ class LoanInterestListAPIView(generics.ListAPIView):
     """
 
     queryset = LoanInterestRate.objects.all()
-    serializer_class = InterestRateSerializer
+    serializer_class = LoanInterestRateInterestRateSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
 
-
-class LoanApprovalAPIView(generics.CreateAPIView):
-    """
-    API view for approving or rejecting loan applications.
-
-    Allows approving or rejecting loan applications and sending notification emails to users.
-    """
-
-    queryset = LoanApproval.objects.all()
-    serializer_class = LoanApprovalSerializer
-    permission_classes = [IsAuthenticated, IsAdminUser]
-
-    def create(self, request, *args, **kwargs):
-        """
-        Handle POST request for approving or rejecting loan applications.
-
-        Args:
-            request: HTTP request object.
-            *args: Additional arguments.
-            **kwargs: Additional keyword arguments.
-
-        Returns:
-            Response: HTTP response with success or error message.
-        """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        # Update loan application status
-        loan_application = serializer.validated_data["loan_application"]
-        new_status = serializer.validated_data["new_status"]
-        loan_application.status = new_status
-        loan_application.save()
-
-        # Create loan approval instance
-        loan_approval = serializer.save()
-
-        send_mail(
-            "Loan Approval Notification",
-            f"Your loan application for {loan_application.loan_type} has been {new_status.lower()}.",
-            "tkmce.alumniportal@gmail.com",
-            [loan_application.user.email],
-            fail_silently=True,
-        )
-
-        return Response(
-            {"message": "Loan status updated and notification sent"},
-            status=status.HTTP_201_CREATED,
-        )
 
 
 class UserLoanApplicationListView(generics.ListAPIView):
@@ -642,69 +524,6 @@ class UserLoanApplicationListView(generics.ListAPIView):
         """
         return LoanApplication.objects.all()
 
-
-class BlockUserAPIView(APIView):
-    """
-    API view for blocking a user.
-
-    Allows blocking a user by their ID.
-    """
-
-    permission_classes = [IsAuthenticated, IsAdminUser]
-
-    def post(self, request, userid):
-        """
-        Handle POST request for blocking a user.
-
-        Args:
-            request: HTTP request object.
-            userid: User ID.
-
-        Returns:
-            Response: HTTP response with success or error message.
-        """
-        user = get_object_or_404(CustomUser, id=userid)
-        user.is_blocked = True
-        user.save()
-        return Response(
-            {"message": "User has been successfully blocked."},
-            status=status.HTTP_200_OK,
-        )
-
-
-class UnblockUserAPIView(APIView):
-    """
-    API view for unblocking a user.
-
-    Allows unblocking a user by their ID.
-    """
-
-    permission_classes = [IsAuthenticated, IsAdminUser]
-
-    def post(self, request, userid):
-        """
-        Handle POST request for unblocking a user.
-
-        Args:
-            request: HTTP request object.
-            userid: User ID.
-
-        Returns:
-            Response: HTTP response with success or error message.
-        """
-        user = get_object_or_404(CustomUser, id=userid)
-        if user.is_blocked:
-            user.is_blocked = False
-            user.failed_login_attempts = 0
-            user.save()
-            return Response(
-                {"message": "User has been successfully unblocked."},
-                status=status.HTTP_200_OK,
-            )
-        else:
-            return Response(
-                {"error": "User is not blocked."}, status=status.HTTP_400_BAD_REQUEST
-            )
 
 
 class CustomerReviewDisplayAPIView(APIView):

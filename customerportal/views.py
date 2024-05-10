@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 from pyexpat.errors import messages
 from django.shortcuts import get_object_or_404, render
+from django.views import View
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -86,7 +87,8 @@ def send_registration_email(email):
     send_mail(subject, message, sender_email, recipient_list)
 
 
-class CustomerLoginView(generics.CreateAPIView):
+
+class CustomerLoginView(APIView):
     """
     Log in to AX Bank.
 
@@ -97,85 +99,55 @@ class CustomerLoginView(generics.CreateAPIView):
     Too many failed login attempts will temporarily block access for security purposes.
     """
 
-    permission_classes = [AllowAny]  # Allow any user to attempt login
-    queryset = User.objects.all()
+    permission_classes = [AllowAny]
     serializer_class = CustomerLoginSerializer
     MAX_LOGIN_ATTEMPTS = 3
-    BLOCK_DURATION_SECONDS = 300  # Block user for 5 minutes (300 seconds)
+    BLOCK_DURATION_SECONDS = 5  
 
     def post(self, request, *args, **kwargs):
-        """
-        Handle customer login.
-
-        After successful login, customers will receive access to their accounts with AX Bank.
-        Too many failed login attempts will temporarily block access for security purposes.
-
-        Args:
-            request: HTTP request object.
-
-        Returns:
-            HTTP response indicating login status.
-        """
-        serializer = CustomerLoginSerializer(data=request.data)
+        serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data.get("email")
             password = serializer.validated_data.get("password")
             user = authenticate(email=email, password=password)
 
             if user:
-                # Check if user is blocked
-                if cache.get(email):
-                    return Response(
-                        {
-                            "message": "Account is temporarily blocked. Please try again later."
-                        },
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
+                # Clear any existing login attempts
+                cache.delete(email)
 
                 # Attempt login
                 if user.check_password(password):
-                    # Clear login attempts on successful login
-                    cache.delete(email)
-
-                    # Generate JWT access token
-                    access_token = AccessToken.for_user(user)
-                    # Generate JWT refresh token
-                    refresh_token = RefreshToken.for_user(user)
-
+                    # Generate JWT access token and refresh token
+                    refresh = RefreshToken.for_user(user)
                     return Response(
                         {
-                            "access_token": str(access_token),
-                            "refresh_token": str(refresh_token),
+                            "access_token": str(refresh.access_token),
+                            "refresh_token": str(refresh),
                             "message": "Welcome back! You're now logged in.",
                         },
                         status=status.HTTP_200_OK,
                     )
-                else:
-                    # Increment login attempt count
-                    attempts = cache.get(email, 0)
-                    attempts += 1
-                    cache.set(email, attempts, self.BLOCK_DURATION_SECONDS)
-
-                    # Check if login attempts exceed threshold
-                    if attempts >= self.MAX_LOGIN_ATTEMPTS:
-                        return Response(
-                            {
-                                "message": "Too many failed login attempts. Account blocked."
-                            },
-                            status=status.HTTP_403_FORBIDDEN,
-                        )
-                    else:
-                        return Response(
-                            {"message": "Invalid email or password."},
-                            status=status.HTTP_401_UNAUTHORIZED,
-                        )
             else:
-                return Response(
-                    {"message": "Invalid email or password."},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
+                # Increment login attempt count
+                attempts = cache.get(email, 0)
+                attempts += 1
+                cache.set(email, attempts, self.BLOCK_DURATION_SECONDS)
+
+                # Check if login attempts exceed threshold
+                if attempts >= self.MAX_LOGIN_ATTEMPTS:
+                    return Response(
+                        {"message": "Too many failed login attempts. Account blocked 300seconds."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
+            # Invalid email or password
+            return Response(
+                {"message": "Invalid email or password."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class CustomerLogoutView(generics.GenericAPIView):
@@ -277,13 +249,14 @@ class UpdateProfileAPIView(APIView):
             HTTP response indicating profile update status.
         """
         user = self.get_object()
-        serializer = CustomerRegistrationSerializer(user, data=request.data)
+        serializer = CustomerRegistrationSerializer(user, data=request.data, partial=True)  # Set partial=True
         if serializer.is_valid():
             serializer.save()
             return Response(
                 {"message": "Profile updated successfully"}, status=status.HTTP_200_OK
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class BankAccountListView(APIView):
@@ -308,6 +281,7 @@ class BankAccountListView(APIView):
         bank_accounts = BankAccount.objects.all()
         serializer = BankAccountSerializer(bank_accounts, many=True)
         return Response(serializer.data)
+
 
 
 class CreateAccountAPIView(APIView):
@@ -337,6 +311,7 @@ class CreateAccountAPIView(APIView):
             message = f"Account created successfully. Your account number is: {account_number}"
             return Response({"message": message}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class UserAccountAPIView(APIView):
@@ -590,6 +565,7 @@ class TransactionHistoryAPIView(APIView):
             )
 
         return Response(response_data)
+
 
 
 class FixedDepositCreateAPIView(generics.CreateAPIView):
@@ -920,6 +896,48 @@ class FundTransferAPIView(APIView):
         return Response(response_data)
 
 
+
+
+class FundTransferListAPIView(generics.ListAPIView):
+    """
+    API view for listing fund transfers.
+
+    Allows listing all fund transfers.
+    """
+
+    serializer_class = FundTransferSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Get queryset of fund transfers for the authenticated user.
+
+        Returns:
+            QuerySet: Fund transfer queryset filtered by sender_account_number.
+        """
+        user = self.request.user
+        return FundTransfer.objects.filter(user=user)
+
+    def list(self, request, *args, **kwargs):
+        """
+        Handle GET request for listing fund transfers.
+
+        Args:
+            request: HTTP request object.
+            *args: Additional arguments.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Response: HTTP response with list of fund transfers or message if no transfers found.
+        """
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        if not queryset:
+            return Response({"message": "No fund transfers found for the current user."})
+        return Response(serializer.data)
+
+
+
 class LoanApplicationCreateAPIView(generics.CreateAPIView):
     """
     API view for creating a loan application.
@@ -1026,7 +1044,7 @@ class RatingReviewAPIView(APIView):
             HTTP response containing the ratings and reviews.
         """
         customer_id = request.user.id
-        ratings_reviews = ReviewRatingDb.objects.filter(customer_id=customer_id)
+        ratings_reviews = ReviewRatingDb.objects.filter(user_id=customer_id)
         serializer = ReviewRatingDbSerializer(ratings_reviews, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1042,20 +1060,28 @@ class RatingReviewAPIView(APIView):
         """
         customer_id = request.user.id
         customer_rating = request.data.get("rating")
-        customer_subject = request.data.get("subject")
-        customer_review = request.data.get("review")
+
+        if customer_rating is None:
+            return Response(
+                {"error": "rating is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         obj = ReviewRatingDb.objects.create(
-            customer_id=customer_id,
+            user_id=customer_id,
             rating=customer_rating,
-            subject=customer_subject,
-            review=customer_review,
         )
         return Response(
-            {"message": "Rating and review saved successfully"},
+            {"message": "Rating saved successfully"},
             status=status.HTTP_201_CREATED,
         )
 
+
+
+from rest_framework.response import Response
+from rest_framework import status
+from .models import CustomerMessages
+from .serializers import CustomerMessagesSerializer
 
 class SaveCustomerMessagesAPIView(APIView):
     """
@@ -1074,21 +1100,25 @@ class SaveCustomerMessagesAPIView(APIView):
         Returns:
             HTTP response indicating the result of the message submission.
         """
-        customer_id = request.user.id
+        customer_email = request.user.email
         email_ = request.data.get("email")
         phone_no_ = request.data.get("phone_no")
         message_ = request.data.get("message")
-        obj = CustomerMessages.objects.create(
-            customer_id=customer_id,
-            email=email_,
-            phone_number=phone_no_,
-            message=message_,
-        )
-        messages.success(request, "Your message has been sent successfully")
-        return Response(
-            {"message": "Your message has been sent successfully"},
-            status=status.HTTP_200_OK,
-        )
+        
+        serializer = CustomerMessagesSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(
+                {"message": "Your message has been sent successfully"},
+                status=status.HTTP_200_OK,
+            )
+        else:
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
 
 
 class BudgetAPIView(APIView):
@@ -1219,29 +1249,31 @@ class ExpenseListCreateAPIView(generics.ListCreateAPIView):
             None
         """
         expense = serializer.save(user=self.request.user)
-        category = expense.category
+        category = expense.budget.category_name
         amount = expense.amount
 
-        budgets = Budget.objects.filter(user=self.request.user)
+        budget = expense.budget
+        if amount > budget.allotted_budget:
+            subject = "Budget Alert: High Expenses"
+            message = (
+                f"Dear {self.request.user.username},\n\n"
+                f"Your expense for the category '{category}' exceeded the allotted budget.\n\n"
+                f"Category: {category}\n"
+                f"Expense Amount: ${amount}\n"
+                f"Allotted Budget: ${budget.allotted_budget}\n"
+                f"Transaction Date: {expense.date}\n\n"
+                f"Please review your expenses and adjust accordingly.\n\n"
+                f"Best regards,\nAX Bank Team"
+            )
+            from_email = "axbank@gmail.com"
+            to_email = [self.request.user.email]
+            send_mail(subject, message, from_email, to_email)
 
-        for budget in budgets:
-            if category == budget.category_name:
-                if amount > budget.allotted_budget:
-                    subject = "Budget Alert: High Expenses"
-                    message = (
-                        f"Dear {self.request.user.username},\n\n"
-                        f"Your expense for the category '{category}' exceeded the allotted budget.\n\n"
-                        f"Category: {category}\n"
-                        f"Expense Amount: ${amount}\n"
-                        f"Allotted Budget: ${budget.allotted_budget}\n"
-                        f"Transaction Date: {expense.date}\n\n"
-                        f"Please review your expenses and adjust accordingly.\n\n"
-                        f"Best regards,\nAX Bank Team"
-                    )
-                    from_email = "axbank@gmail.com"
-                    to_email = [self.request.user.email]
-                    send_mail(subject, message, from_email, to_email)
-                    break
+        return Response(
+            {"message": "Expense created successfully", "data": serializer.data},
+            status=status.HTTP_201_CREATED,
+        )
+
 
 
 class SavingsGoalListCreateAPIView(generics.ListCreateAPIView):

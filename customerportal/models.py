@@ -16,9 +16,11 @@ class Savings(models.Model):
         (CURRENT, 'Current'),
     ]
 
-    SAVINGS_TRANSACTION_LIMIT = 25000
+    SAVINGS_TRANSACTION_LIMIT = 70000
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    aadhar_number = models.CharField(max_length=12, unique=True, default= 0)
+    phone_number = models.CharField(max_length=10, unique=True, default=0)
     account_number = models.CharField(max_length=10, unique=True, default=0)
     account_type = models.CharField(max_length=10, choices=ACCOUNT_TYPES)
     balance = models.DecimalField(max_digits=15, decimal_places=2, default=0)
@@ -124,6 +126,7 @@ class CurrentTransaction(models.Model):
         return f"{self.transaction_type} of {self.amount} on {self.date}"
 
 
+
 class FixedDeposit(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=15, decimal_places=2)
@@ -158,6 +161,7 @@ class RecurrentDeposit(models.Model):
 
 
 class FundTransfer(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, default=True)
     sender_account_number = models.CharField(max_length=10)
     receiver_account_number = models.CharField(max_length=10)
     amount = models.DecimalField(max_digits=15, decimal_places=2)
@@ -206,12 +210,6 @@ class CustomerMessages(models.Model):
     phone_number = models.CharField(max_length=100, blank=True, null=True)
     message = models.CharField(max_length=100, blank=True, null=True)
 
-class Expense(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    category = models.CharField(max_length=100)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    description = models.TextField()
-    date = models.DateField(auto_now_add=True)
 
 
 
@@ -227,13 +225,13 @@ class Budget(models.Model):
 
 class Expense(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    category = models.CharField(max_length=100)
+    budget = models.ForeignKey(Budget, on_delete=models.CASCADE)  # Connect expense to budget
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField()
     date = models.DateField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.category} - ${self.amount}"
+        return f"{self.user.username} - {self.budget.category_name} - ${self.amount}"
 
 
 class SavingsGoal(models.Model):

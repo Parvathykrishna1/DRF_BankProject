@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from customerportal.models import LoanApplication
+from django.conf import settings
 
 
 
@@ -9,6 +10,7 @@ class CustomUser(AbstractUser):
     last_name = models.CharField(max_length=100)
     email = models.EmailField(max_length=255,unique=True)
     staff = models.BooleanField(default=False)
+    blocked = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username','first_name','last_name']
@@ -43,10 +45,16 @@ class LoanInterestRate(models.Model):
     rate = models.DecimalField(max_digits=5, decimal_places=2)
 
 
+
 class LoanApproval(models.Model):
-    loan_application = models.OneToOneField(LoanApplication, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     approved_date = models.DateField(auto_now_add=True)
     new_status = models.CharField(max_length=20, choices=LoanApplication.STATUS_CHOICES, default='Approved')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.approved_date}"
+
+
 
 
 class BankNews(models.Model):
